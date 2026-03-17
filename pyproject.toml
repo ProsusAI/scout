@@ -1,0 +1,25 @@
+[project]
+name = "scout"
+version = "0.1.0"
+description = "Scout — real-time Slack ingestion and search engine data pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    "slack_bolt>=1.18.0",
+    "slack_sdk>=3.27.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+delta = ["databricks-sql-connector>=3.0.0"]
+opensearch = ["opensearch-py>=2.0.0"]
+all = ["databricks-sql-connector>=3.0.0", "opensearch-py>=2.0.0"]
+
+[project.scripts]
+scout-slack-listener = "scout.slack_listener.app:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
