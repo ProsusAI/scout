@@ -29,6 +29,7 @@ def message_to_doc(
     real_name: str,
     msg: dict,
     file_paths: list[str] | None = None,
+    thread_replies: list[dict] | None = None,
 ) -> dict:
     """
     Build a document from a Slack message.
@@ -39,6 +40,17 @@ def message_to_doc(
     """
     ts = msg.get("ts", "")
     text = _extract_full_text(msg)
+    if thread_replies:
+        reply_texts: list[str] = []
+        for reply in thread_replies:
+            r_ts = reply.get("ts", "")
+            r_user = (reply.get("user") or "unknown").strip() or "unknown"
+            r_text = _extract_full_text(reply)
+            if not r_text:
+                continue
+            reply_texts.append(f"[{r_ts}] <{r_user}> {r_text}")
+        if reply_texts:
+            text = f"{text}\n\n--- thread_replies ---\n" + "\n\n".join(reply_texts)
     subtype = msg.get("subtype") or ""
     is_bot = subtype == "bot_message" or bool(msg.get("bot_id"))
 

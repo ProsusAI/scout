@@ -11,9 +11,10 @@ import time
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 from scout.slack_listener.config import Config
-from scout.slack_listener.file_downloader import download_message_files
+from scout.slack_listener.file_downloader import download_thread_files
 from scout.slack_listener.storage import StorageWriter
 from scout.slack_listener.transforms import message_to_doc
 from scout.slack_listener.user_cache import UserCache
@@ -101,6 +102,29 @@ def run_socket_mode(config: Config, writer: StorageWriter) -> None:
         channel_name_cache[channel_id] = name
         return name
 
+    def _fetch_thread_messages(channel_id: str, root_ts: str) -> list[dict]:
+        messages: list[dict] = []
+        cursor = None
+        while True:
+            params: dict = {"channel": channel_id, "ts": root_ts, "limit": 200}
+            if cursor:
+                params["cursor"] = cursor
+            try:
+                resp = client.conversations_replies(**params)
+            except SlackApiError as e:
+                if e.response.status_code == 429:
+                    wait = int(e.response.headers.get("Retry-After", 10))
+                    logger.warning("Rate limited on thread fetch %s, waiting %ds", root_ts, wait)
+                    time.sleep(wait)
+                    continue
+                logger.warning("Thread fetch failed for %s: %s", root_ts, e)
+                return []
+            messages.extend(resp.get("messages", []))
+            cursor = (resp.get("response_metadata") or {}).get("next_cursor")
+            if not cursor:
+                break
+        return messages
+
     _SKIP_SUBTYPES = {"channel_join", "channel_leave", "channel_topic", "channel_purpose"}
 
     @app.event("message")
@@ -126,17 +150,33 @@ def run_socket_mode(config: Config, writer: StorageWriter) -> None:
             return
 
         channel_name = _resolve_channel(channel_id)
-        user_id = msg.get("user", "")
+        root_ts = msg.get("thread_ts") or ts
+
+        thread_messages: list[dict] = []
+        if msg.get("thread_ts") or int(msg.get("reply_count", 0) or 0) > 0:
+            thread_messages = _fetch_thread_messages(channel_id, root_ts)
+
+        if thread_messages:
+            root_msg = next((m for m in thread_messages if m.get("ts") == root_ts), thread_messages[0])
+            thread_replies = [m for m in thread_messages if m.get("ts") != root_ts]
+        else:
+            root_msg = msg
+            thread_replies = []
+
+        user_id = root_msg.get("user", "")
         user_name, real_name = user_cache.resolve(user_id) if user_id else ("", "Unknown")
-        file_paths = download_message_files(msg, config.slack_token, config.files_dir)
+        file_paths = download_thread_files(
+            [root_msg, *thread_replies], config.slack_token, config.files_dir
+        )
 
         doc = message_to_doc(
             channel_id=channel_id,
             channel_name=channel_name,
             user_name=user_name,
             real_name=real_name,
-            msg=msg,
+            msg=root_msg,
             file_paths=file_paths,
+            thread_replies=thread_replies,
         )
         queue.enqueue_upsert(doc)
         preview = doc["text"][:60] + ("..." if len(doc["text"]) > 60 else "")

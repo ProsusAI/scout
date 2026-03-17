@@ -129,3 +129,23 @@ def download_message_files(
             logger.warning("Failed to download file %s", file_id)
 
     return saved_paths
+
+
+def download_thread_files(
+    messages: list[dict], token: str, target_dir: str
+) -> list[str]:
+    """
+    Download supported attachments across all messages in a thread.
+    Returns de-duplicated saved paths while preserving first-seen order.
+    """
+    seen: set[str] = set()
+    saved_paths: list[str] = []
+
+    for msg in messages:
+        for path in download_message_files(msg, token, target_dir):
+            if path in seen:
+                continue
+            seen.add(path)
+            saved_paths.append(path)
+
+    return saved_paths
