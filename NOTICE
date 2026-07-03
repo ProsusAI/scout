@@ -1,0 +1,29 @@
+Scout
+Copyright © 2026 MIH AI B.V.
+
+This product includes software developed at MIH AI B.V.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+------------------------------------------------------------------------
+Third-party dependencies and their licenses
+------------------------------------------------------------------------
+
+This software depends on the following third-party packages. Each is the
+property of its respective copyright holders and is used under the terms of
+its own license.
+
+  slack_bolt                 (MIT License)         — Slack Technologies, Inc.
+  slack_sdk                  (MIT License)         — Slack Technologies, Inc.
+  requests                   (Apache-2.0 License)  — Kenneth Reitz / PSF
+  databricks-sql-connector   (Apache-2.0 License)  — Databricks, Inc.   [optional: delta]
+  opensearch-py              (Apache-2.0 License)  — OpenSearch Contributors [optional: opensearch]
+  setuptools                 (MIT License)         — Python Packaging Authority [build]
+
+Base container image: python:3.11-slim (Python Software Foundation License).
+
+Full license texts are available from each project's distribution.
